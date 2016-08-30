@@ -1,6 +1,7 @@
-package com.holemcross.deltatrack.Activities;
+package com.holemcross.deltatrack.activities;
 
 import android.annotation.SuppressLint;
+import android.net.Uri;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -9,12 +10,14 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import com.holemcross.deltatrack.R;
+import com.holemcross.deltatrack.fragments.StationFragment;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
  * status bar and navigation/system bar) with user interaction.
  */
-public class DeltaTrackActivity extends AppCompatActivity {
+public class DeltaTrackActivity extends AppCompatActivity
+        implements StationFragment.OnFragmentInteractionListener {
     /**
      * Whether or not the system UI should be auto-hidden after
      * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
@@ -161,5 +164,10 @@ public class DeltaTrackActivity extends AppCompatActivity {
     private void delayedHide(int delayMillis) {
         mHideHandler.removeCallbacks(mHideRunnable);
         mHideHandler.postDelayed(mHideRunnable, delayMillis);
+    }
+
+    @Override
+    public void onFragmentInteraction(Uri uri) {
+        // Do nothing
     }
 }

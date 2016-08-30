@@ -1,4 +1,4 @@
-package com.holemcross.deltatrack.Fragments;
+package com.holemcross.deltatrack.fragments;
 
 import android.content.Context;
 import android.net.Uri;

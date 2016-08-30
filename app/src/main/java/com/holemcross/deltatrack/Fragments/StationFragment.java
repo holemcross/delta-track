@@ -1,14 +1,25 @@
-package com.holemcross.deltatrack.Fragments;
+package com.holemcross.deltatrack.fragments;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import com.holemcross.deltatrack.data.TrainArrival;
+import com.holemcross.deltatrack.exceptions.CtaServiceException;
 import com.holemcross.deltatrack.R;
+import com.holemcross.deltatrack.services.CtaService;
+
+import org.json.JSONException;
+
+import java.util.ArrayList;
+
+import Helpers.KeyManager;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -21,8 +32,11 @@ import com.holemcross.deltatrack.R;
 public class StationFragment extends Fragment {
     // TODO: Rename parameter arguments, choose names that match
     // the fragment initialization parameters, e.g. ARG_ITEM_NUMBER
+    private static final String Log_TAG = StationFragment.class.getSimpleName();
     private static final String ARG_PARAM1 = "param1";
     private static final String ARG_PARAM2 = "param2";
+
+    private ArrayList<TrainArrival> arrivals;
 
     // TODO: Rename and change types of parameters
     private String mParam1;
@@ -59,6 +73,13 @@ public class StationFragment extends Fragment {
             mParam1 = getArguments().getString(ARG_PARAM1);
             mParam2 = getArguments().getString(ARG_PARAM2);
         }
+
+        arrivals = new ArrayList<TrainArrival>();
+
+        Integer defaultMapId = 40730;
+        FetchArrivalsTask task = new FetchArrivalsTask();
+        task.execute(defaultMapId);
+        Log.v(Log_TAG, "Task has executed!");
     }
 
     @Override
@@ -105,5 +126,40 @@ public class StationFragment extends Fragment {
     public interface OnFragmentInteractionListener {
         // TODO: Update argument type and name
         void onFragmentInteraction(Uri uri);
+    }
+
+    private class FetchArrivalsTask extends AsyncTask<Integer, Void, ArrayList<TrainArrival>> {
+
+        @Override
+        protected ArrayList<TrainArrival> doInBackground(Integer...mapIds){
+            Log.v(Log_TAG, "Entered Task.doInBackground()!");
+            if(mapIds.length == 0){
+                // No Map Ids
+                return new ArrayList<TrainArrival>();
+            }
+            Integer mapId = mapIds[0];
+            String apiKey = KeyManager.GetCtaApiKey(getContext());
+
+            CtaService service = new CtaService();
+            ArrayList<TrainArrival> resultList = null;
+            try{
+                resultList = service.GetTrainArrivalsForMapId(mapId, apiKey);
+            }catch(CtaServiceException ex){
+                return null;
+            }
+
+            return resultList;
+        }
+
+        @Override
+        protected void onPostExecute(ArrayList<TrainArrival> trainArrivals) {
+            //super.onPostExecute(trainArrivals);
+            if(trainArrivals != null){
+                for ( TrainArrival train: trainArrivals
+                     ) {
+                    Log.v(Log_TAG, "Train " + train.route.toString() + " Arrival Time: " + train.arrivalTime);
+                }
+            }
+        }
     }
 }

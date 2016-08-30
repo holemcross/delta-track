@@ -1,4 +1,4 @@
-package com.holemcross.deltatrack.Data;
+package com.holemcross.deltatrack.data;
 
 /**
  * Created by amortega on 8/25/2016.

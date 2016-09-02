@@ -1,5 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Dash Board -->
+    <color name="dashBackground">#3F51B5</color>
+    <!-- Dash Board Header-->
+    <color name="dashHeaderBackground">#7f7f7f</color>
+    <color name="dashText">#3F51B5</color>
+
+    <!-- Dash Row -->
+    <color name="dashRowBackground">#595959</color>
+    <color name="dashRowTrainRed">#c60c30</color>
+    <color name="dashRowTrainBlue">#3F51B5</color>
+    <color name="dashRowTrainBrown">#623607</color>
+    <color name="dashRowTrainGreen">#62a11b</color>
+    <color name="dashRowTrainOrange">#f9461c</color>
+    <color name="dashRowTrainPurple">#f9461c</color>
+    <color name="dashRowTrainPink">#522398</color>
+    <color name="dashRowTrainYellow">#f9e300</color>
+
+    <color name="dashRowText">#FFFFFF</color>
+    <color name="dashRowTextDark">#000000</color>
+
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#FF4081</color>

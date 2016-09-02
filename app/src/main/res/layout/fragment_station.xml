@@ -6,14 +6,77 @@
 
     <!-- TODO: Update blank fragment layout -->
     <android.support.v7.widget.LinearLayoutCompat
+        android:orientation="vertical"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/arrival_text" />
+        <!-- Header -->
+        <LinearLayout
+            android:layout_weight="10"
+            android:background="@color/dashHeaderBackground"
+            android:gravity="center_vertical"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
+            <TextView
+                android:id="@+id/dashHeaderStationNameLabel"
+                android:text="@string/default_dash_stationName_label"
+                android:textColor="@color/dashRowText"
+                android:textSize="70sp"
+                android:textAlignment="center"
+                android:layout_weight="70"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <LinearLayout
+                android:layout_weight="30"
+                android:orientation="vertical"
+                android:gravity="center"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent">
+                <TextView
+                    android:id="@+id/dashHeaderClockLabel"
+                    android:text="@string/default_dash_clock_label"
+                    android:textColor="@color/dashRowText"
+                    android:textSize="50sp"
+                    android:textAlignment="center"
+                    android:layout_weight="70"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+                <TextView
+                    android:id="@+id/dashHeaderUpdateLabel"
+                    android:text="@string/default_dash_lastUpdate_label"
+                    android:textColor="@color/dashRowText"
+                    android:textSize="20sp"
+                    android:textAlignment="textEnd"
+                    android:layout_weight="30"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <!-- List Adapter -->
+        <ListView
+            android:id="@+id/dashArrivalsListView"
+            android:layout_weight="90"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+        </ListView>
+        <!--
+        <LinearLayout
+            android:background="@color/dashRowBackground"
+            android:layout_weight="90"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/arrival_text" />
+        </LinearLayout>
+        -->
     </android.support.v7.widget.LinearLayoutCompat>
 
 

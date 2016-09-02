@@ -105,6 +105,12 @@ public class DeltaTrackActivity extends AppCompatActivity
         }
     };
 
+    public void refreshStations(){
+        Log.d(LOG_TAG, "Refreshing Stations.");
+        FetchStationsTask task = new FetchStationsTask();
+        task.execute();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

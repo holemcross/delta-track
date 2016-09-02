@@ -5,11 +5,18 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.text.Layout;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Adapter;
+import android.widget.ArrayAdapter;
+import android.widget.BaseAdapter;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import com.holemcross.deltatrack.data.TrainArrival;
@@ -17,20 +24,18 @@ import com.holemcross.deltatrack.exceptions.CtaServiceException;
 import com.holemcross.deltatrack.R;
 import com.holemcross.deltatrack.services.CtaService;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
+
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 import helpers.Constants;
 import helpers.KeyManager;
 import helpers.Serializer;
+import helpers.UiHelper;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -51,7 +56,23 @@ public class StationFragment extends Fragment {
     private int mStationMapId;
     private Date mLastArrivalsRefresh;
     private ArrayList<TrainArrival> mArrivals;
+    private ArrivalsListAdapter mArrivalsAdapter;
+    private ListView mArrivalsListView;
+    private int mRefreshArrivalsDelay; // In Seconds
     private int mFetchTaskRetryCount;
+    private final Handler mRefreshHandler = new Handler();
+
+    private final Runnable refreshArrivals = new Runnable() {
+        @Override
+        public void run() {
+            mLastArrivalsRefresh = new Date();
+            mRefreshHandler.postDelayed(this, mRefreshArrivalsDelay * 1000);
+            Log.v(Log_TAG,"Refreshing arrival times.");
+            FetchArrivalsTask task = new FetchArrivalsTask();
+            task.execute(mStationMapId);
+        }
+    };
+
 
     private OnFragmentInteractionListener mListener;
 
@@ -79,7 +100,8 @@ public class StationFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mFetchTaskRetryCount = 0;
-
+        mRefreshArrivalsDelay = 15;
+        mArrivals = new ArrayList<TrainArrival>();
         if(savedInstanceState != null){
             // restore state data
             mStationMapId = savedInstanceState.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
@@ -94,24 +116,40 @@ public class StationFragment extends Fragment {
             mLastArrivalsRefresh = restoredDate;
 
             mArrivals = (ArrayList<TrainArrival>) Serializer.deserializeObject(savedInstanceState.getByteArray(Constants.StationFragment.STATE_ARRIVALS));
-
             Log.v(Log_TAG, "Restored Station Fragment from saved state.");
-            return;
-        }
 
-        if (getArguments() != null) {
-            mStationMapId = getArguments().getInt(ARG_PARAM_MAPID, DEFAULT_MAP_ID);
+            mRefreshHandler.post(refreshArrivals);
         }else{
-            SharedPreferences prefs = getContext().getSharedPreferences(Constants.SYSTEM_SETTINGS_NAME, Context.MODE_PRIVATE);
-            mStationMapId = prefs.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
+            if (getArguments() != null) {
+                mStationMapId = getArguments().getInt(ARG_PARAM_MAPID, DEFAULT_MAP_ID);
+            }else{
+                SharedPreferences prefs = getContext().getSharedPreferences(Constants.SYSTEM_SETTINGS_NAME, Context.MODE_PRIVATE);
+                mStationMapId = prefs.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
+            }
         }
 
-        mArrivals = new ArrayList<TrainArrival>();
-        FetchArrivalsTask task = new FetchArrivalsTask();
-        task.execute(mStationMapId);
+
+
         Log.v(Log_TAG, "Task has executed!");
 
         saveStateToPreferences();
+
+
+    }
+
+    @Override
+    public void onActivityCreated(@Nullable Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+
+        if(mArrivalsListView == null){
+            mArrivalsListView = (ListView)getView().findViewById(R.id.dashArrivalsListView);
+        }
+        if(mArrivalsAdapter == null){
+            mArrivalsAdapter = new ArrivalsListAdapter(mArrivals);
+        }
+        mArrivalsListView.setAdapter(mArrivalsAdapter);
+        // Activate Arrival Refresh Timer
+        mRefreshHandler.post(refreshArrivals);
     }
 
     @Override
@@ -163,11 +201,13 @@ public class StationFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
+        mRefreshHandler.removeCallbacks(refreshArrivals);
     }
 
     @Override
     public void onResume() {
         super.onResume();
+        mRefreshHandler.post(refreshArrivals);
     }
 
     @Override
@@ -186,15 +226,19 @@ public class StationFragment extends Fragment {
     }
 
     private void updateArrivalsUi(){
+        Log.v(Log_TAG, "Refreshing Arrivals UI");
+        mArrivalsAdapter.updateArrayList(mArrivals);
+        /*
         TextView arrivalTextView = (TextView) getActivity().findViewById(R.id.arrival_text);
 
         String arrivalsText = "";
-
-        for (TrainArrival arrival: mArrivals
+                for (TrainArrival arrival: mArrivals
                 ) {
-            arrivalsText += "Train:"+ arrival.runNumber + ", ";
+                    String arrivalTimeText = Long.toString(arrival.getArrivalDurationInSeconds()/60) + " mins";
+            arrivalsText += "Train:"+ arrival.runNumber + " " + arrivalTimeText+", ";
         }
         arrivalTextView.setText(arrivalsText);
+        */
     }
 
     private void saveStateToPreferences(){
@@ -238,19 +282,77 @@ public class StationFragment extends Fragment {
                      ) {
                     Log.v(Log_TAG, "Train " + train.route.toString() + " Arrival Time: " + train.arrivalTime);
                 }
+                mFetchTaskRetryCount = 0;
                 mLastArrivalsRefresh = new Date();
                 mArrivals = trainArrivals;
                 updateArrivalsUi();
             }else{
                 // Failed to fetch results
-                mFetchTaskRetryCount++;
-
                 if(mFetchTaskRetryCount < MAX_TASK_RETRIES){
+                    Log.v(Log_TAG, "Failed to get Arrivals. Checking attempting retry");
                     // Perform Retry
+                    mFetchTaskRetryCount++;
                     FetchArrivalsTask task = new FetchArrivalsTask();
                     task.execute(mStationMapId);
+                }else{
+                    Log.d(Log_TAG, "Failed to get Arrivals. Timed Out!");
                 }
             }
+        }
+    }
+
+    private class ArrivalsListAdapter extends BaseAdapter {
+        private ArrayList<TrainArrival> mArrivalsList;
+
+        public ArrivalsListAdapter() {
+            super();
+            mArrivalsList = new ArrayList<TrainArrival>();
+        }
+        public ArrivalsListAdapter(ArrayList<TrainArrival> newList) {
+            super();
+            mArrivalsList = newList;
+        }
+
+        public void updateArrayList(ArrayList<TrainArrival> newArrivalsList){
+            mArrivalsList = newArrivalsList;
+        }
+
+        @Override
+        public int getCount() {
+            return mArrivalsList.size();
+        }
+
+        @Override
+        public Object getItem(int i) {
+            return mArrivalsList.get(i);
+        }
+
+        @Override
+        public long getItemId(int i) {
+            return i;
+        }
+
+        @Override
+        public View getView(int index, View convertView, ViewGroup parent) {
+
+            // Get Arrival
+            TrainArrival arrival = mArrivalsList.get(index);
+
+            LayoutInflater inflator = getActivity().getLayoutInflater();
+
+            View row = inflator.inflate(R.layout.list_arrival_row, null);
+
+            TextView indexTextView = (TextView)row.findViewById(R.id.list_arrival_index_label);
+            TextView destinationTextView = (TextView)row.findViewById(R.id.list_arrival_destination_label);
+            TextView displayTextView = (TextView)row.findViewById(R.id.list_arrival_display);
+
+            indexTextView.setText(Integer.toString(index+1));
+            destinationTextView.setText(arrival.destinationName);
+            destinationTextView.setBackgroundColor(UiHelper.Colors.getRouteBackgroundColorByCtaRoute(arrival.route));
+            destinationTextView.setTextColor(UiHelper.Colors.getTextColorByCtaRoute(arrival.route));
+            displayTextView.setText(arrival.getArrivalDisplay());
+
+            return row;
         }
     }
 }

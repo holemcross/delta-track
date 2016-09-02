@@ -3,9 +3,13 @@ package com.holemcross.deltatrack.data;
 import org.w3c.dom.Element;
 
 import java.io.Serializable;
+import java.sql.Time;
+import java.util.Calendar;
 import java.util.Date;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.GregorianCalendar;
+import java.util.concurrent.TimeUnit;
 
 import helpers.Constants;
 
@@ -31,6 +35,33 @@ public class TrainArrival implements Serializable {
 
     public TrainArrival(){
 
+    }
+
+    public long getArrivalDurationInSeconds(){
+
+        long endTime = TimeUnit.MILLISECONDS.toSeconds(arrivalTime.getTime());
+        long startTime = TimeUnit.MILLISECONDS.toSeconds(new Date().getTime());
+
+        long timeDifference = endTime - startTime;
+
+        return timeDifference;
+    }
+
+    public String getArrivalDisplay(){
+        String displayMessage = "";
+        long timeSpan = getArrivalDurationInSeconds();
+
+
+        if(timeSpan < 60 || isApproaching){
+            displayMessage = "Due";
+        }else{
+            displayMessage = Double.toString(Math.floor(timeSpan / 60)) + " mins";
+        }
+
+        if(isDelayed){
+            displayMessage += "Dly";
+        }
+        return displayMessage;
     }
 
     public TrainArrival(Element ctaEta) throws IllegalArgumentException {

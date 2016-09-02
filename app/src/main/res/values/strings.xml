@@ -1,6 +1,15 @@
 <resources>
     <string name="app_name">DeltaTrack</string>
 
+    <!-- Default Strings -->
+    <string name="default_dash_stationName_label">Station Name</string>
+    <string name="default_dash_clock_label">Sep 12, 12:00PM</string>
+    <string name="default_dash_lastUpdate_label">Last Update 12:00PM</string>
+
+    <string name="default_dash_row_index_label">1</string>
+    <string name="default_dash_row_destination_label">Destination Name</string>
+    <string name="default_dash_row_display_label">10 mins</string>
+
     <string name="dummy_button">Dummy Button</string>
     <string name="dummy_content">DUMMY\nCONTENT</string>
 

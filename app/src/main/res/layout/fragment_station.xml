@@ -5,9 +5,16 @@
     tools:context="com.holemcross.deltatrack.fragments.StationFragment">
 
     <!-- TODO: Update blank fragment layout -->
-    <TextView
+    <android.support.v7.widget.LinearLayoutCompat
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="@string/hello_blank_fragment" />
+        android:layout_height="match_parent">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/arrival_text" />
+
+    </android.support.v7.widget.LinearLayoutCompat>
+
 
 </FrameLayout>

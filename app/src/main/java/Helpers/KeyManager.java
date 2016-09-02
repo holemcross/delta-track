@@ -18,15 +18,15 @@ public class KeyManager {
         if(context != null){
             SharedPreferences sharedPref = context.getSharedPreferences(Constants.SYSTEM_SETTINGS_NAME, Context.MODE_PRIVATE);
             String savedCtaApiKey = sharedPref.getString(Constants.Keys.CtaApiKeyName, null);
-            if(TextUtils.isEmpty(savedCtaApiKey)){
+            if(!TextUtils.isEmpty(savedCtaApiKey)){
                 return savedCtaApiKey;
             }
-        }
 
-        // Get Default API Key
-        String defaultCtaApiKey = Resources.getSystem().getString(R.string.DEFAULT_CTA_API_KEY);
-        if(TextUtils.isEmpty(defaultCtaApiKey)){
-            return defaultCtaApiKey;
+            // Get Default API Key
+            String defaultCtaApiKey = context.getResources().getString(R.string.DEFAULT_CTA_API_KEY);
+            if(!TextUtils.isEmpty(defaultCtaApiKey)){
+                return defaultCtaApiKey;
+            }
         }
 
         Log.d(LOG_TAG, "Could not find CTA API Key");

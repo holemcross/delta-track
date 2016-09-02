@@ -11,9 +11,11 @@ import java.util.Map;
  */
 public class Constants {
     public static final String CTA_API_BASE_URI = "http://lapi.transitchicago.com/api";
+    public static final String CHICAGO_PORTAL_BASE_URI = "https://data.cityofchicago.org";
     public static final String APP_NAME = "Delta-Track";
 
     public static final String SYSTEM_SETTINGS_NAME = "com.holemcross.deltatrack.system-settings";
+    public static final String STATION_FRAGMENT_DATA = "com.holemcross.deltatrack.station-fragment-data";
 
     public static final Map<String, CtaRoutes> CTA_ROUTES_MAP;
     static{
@@ -27,6 +29,12 @@ public class Constants {
         map.put("Pink", CtaRoutes.Pink);
         map.put("Y", CtaRoutes.Yellow);
         CTA_ROUTES_MAP = Collections.unmodifiableMap(map);
+    }
+
+    public static class StationFragment {
+        public static final String STATE_MAPID = "com.holemcross.deltatrack.station-fragment.state-mapid";
+        public static final String STATE_LAST_REFRESH = "com.holemcross.deltatrack.station-fragment.state-last-refresh";
+        public static final String STATE_ARRIVALS = "com.holemcross.deltatrack.station-fragment.state-arrivals";
     }
 
     public static class Keys {

@@ -23,25 +23,23 @@ dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.12'
     testCompile 'org.mockito:mockito-core:1.10.19'
-    testCompile ('org.powermock:powermock-api-mockito:1.6.2') {
+    testCompile('org.powermock:powermock-api-mockito:1.6.2') {
         exclude module: 'hamcrest-core'
         exclude module: 'objenesis'
     }
-    testCompile ('org.powermock:powermock-module-junit4:1.6.2') {
+    testCompile('org.powermock:powermock-module-junit4:1.6.2') {
         exclude module: 'hamcrest-core'
         exclude module: 'objenesis'
     }
     //testCompile 'org.powermock:powermock-mockito-release-full:1.6.4'
     // https://mvnrepository.com/artifact/org.powermock/powermock-mockito-release-full
     //testCompile group: 'org.powermock', name: 'powermock-mockito-release-full', version: '1.6.4', ext: 'pom'
-// https://mvnrepository.com/artifact/org.powermock/powermock-module-junit4
+    // https://mvnrepository.com/artifact/org.powermock/powermock-module-junit4
     //testcompile group: 'org.powermock', name: 'powermock-module-junit4', version: '1.5.1'
-
     compile 'com.android.support:appcompat-v7:24.2.0'
     compile 'com.android.support:support-v4:24.2.0'
     compile 'io.mikael:urlbuilder:2.0.7'
     //compile 'com.eclipsesource.minimal-json:minimal-json:0.9.4'
     compile 'com.google.code.gson:gson:2.7'
-    compile group: 'sax', name: 'sax', version: '2.0.1'
-
+    compile 'sax:sax:2.0.1'
 }

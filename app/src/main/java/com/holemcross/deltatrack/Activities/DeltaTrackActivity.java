@@ -1,16 +1,28 @@
 package com.holemcross.deltatrack.activities;
 
 import android.annotation.SuppressLint;
+import android.content.SharedPreferences;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 
 import com.holemcross.deltatrack.R;
+import com.holemcross.deltatrack.data.repository.StationRepository;
+import com.holemcross.deltatrack.data.Station;
+import com.holemcross.deltatrack.data.database.DeltaTrackDbHelper;
+import com.holemcross.deltatrack.exceptions.CtaServiceException;
 import com.holemcross.deltatrack.fragments.StationFragment;
+import com.holemcross.deltatrack.services.CtaService;
+
+import java.util.ArrayList;
+
+import helpers.Constants;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -18,6 +30,11 @@ import com.holemcross.deltatrack.fragments.StationFragment;
  */
 public class DeltaTrackActivity extends AppCompatActivity
         implements StationFragment.OnFragmentInteractionListener {
+
+    private final String LOG_TAG = DeltaTrackActivity.class.getSimpleName();
+    private final int DEFAULT_MAP_ID = 40730; // Washington/Wells Station - Expect to remove default station on release
+    private ArrayList<Station> mStations;
+
     /**
      * Whether or not the system UI should be auto-hidden after
      * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
@@ -111,6 +128,34 @@ public class DeltaTrackActivity extends AppCompatActivity
         // operations to prevent the jarring behavior of controls going away
         // while interacting with the UI.
         findViewById(R.id.dummy_button).setOnTouchListener(mDelayHideTouchListener);
+
+        // Database Checks
+        DeltaTrackDbHelper dbHelper = new DeltaTrackDbHelper(getApplicationContext());
+
+        // Init DB
+        dbHelper.onCreate(dbHelper.getWritableDatabase());
+        //dbHelper.dropDatabase(dbHelper.getWritableDatabase());
+        Log.d(LOG_TAG, "Stations exist in DB. Loading them into memory.");
+
+        // Get list from DB
+        StationRepository stationRepo = new StationRepository(dbHelper);
+        mStations = stationRepo.getAllStations();
+
+        if(mStations == null || mStations.size() <= 0)
+        {
+            // Perform Fetch
+            Log.d(LOG_TAG, "Stations do not exist in DB. Fetching.");
+            FetchStationsTask task = new FetchStationsTask();
+            task.execute();
+        }
+
+        // Get Current MapId
+        SharedPreferences pref = this.getPreferences(MODE_PRIVATE);
+        int currentMapId = pref.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
+
+        // Create Station Fragment
+
+
     }
 
     @Override
@@ -169,5 +214,60 @@ public class DeltaTrackActivity extends AppCompatActivity
     @Override
     public void onFragmentInteraction(Uri uri) {
         // Do nothing
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+    }
+
+    private boolean dbHasStations(){
+        // TODO IMPLEMENT
+        DeltaTrackDbHelper helper = new DeltaTrackDbHelper(getApplicationContext());
+
+        return true;
+    }
+
+    private class FetchStationsTask extends AsyncTask<String, Void, ArrayList<Station>> {
+
+        @Override
+        protected ArrayList<Station> doInBackground(String... args) {
+            Log.v(LOG_TAG, "Entered Task.doInBackground()!");
+
+            CtaService service = new CtaService();
+            ArrayList<Station> resultList = null;
+            try {
+                resultList = service.GetStations();
+            } catch (CtaServiceException ex) {
+                return null;
+            } catch (Exception ex) {
+                return null;
+            }
+
+            return resultList;
+        }
+
+        @Override
+        protected void onProgressUpdate(Void... values) {
+            super.onProgressUpdate(values);
+        }
+
+        @Override
+        protected void onPostExecute(ArrayList<Station> stations) {
+            super.onPostExecute(stations);
+            if (stations != null) {
+                if(stations.size() > 0){
+                    mStations = stations;
+
+                    DeltaTrackDbHelper dbHelper = new DeltaTrackDbHelper(getApplicationContext());
+                    // Drop DB
+                    dbHelper.dropDatabase(dbHelper.getWritableDatabase());
+                    // Rebuild and update DB
+                    dbHelper.onCreate(dbHelper.getWritableDatabase());
+                    StationRepository stationRepo = new StationRepository(dbHelper);
+                    stationRepo.insertStations(mStations);
+                }
+            }
+        }
     }
 }

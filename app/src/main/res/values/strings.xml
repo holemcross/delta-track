@@ -10,6 +10,8 @@
     <string name="default_dash_row_destination_label">Destination Name</string>
     <string name="default_dash_row_display_label">10 mins</string>
 
+    <string name="dash_no_arrivals_display_label">No train arrivals at this station.</string>
+
     <string name="dummy_button">Dummy Button</string>
     <string name="dummy_content">DUMMY\nCONTENT</string>
 

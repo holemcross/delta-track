@@ -13,8 +13,8 @@
     <color name="dashRowTrainBrown">#623607</color>
     <color name="dashRowTrainGreen">#62a11b</color>
     <color name="dashRowTrainOrange">#f9461c</color>
-    <color name="dashRowTrainPurple">#f9461c</color>
-    <color name="dashRowTrainPink">#522398</color>
+    <color name="dashRowTrainPurple">#522398</color>
+    <color name="dashRowTrainPink">#E27EA6</color>
     <color name="dashRowTrainYellow">#f9e300</color>
 
     <color name="dashRowText">#FFFFFF</color>

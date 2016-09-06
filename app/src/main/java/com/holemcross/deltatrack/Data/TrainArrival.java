@@ -32,6 +32,7 @@ public class TrainArrival implements Serializable {
     public boolean isApproaching;
     public boolean isNotLiveData;
     public boolean isDelayed;
+    public int index;
 
     public TrainArrival(){
 
@@ -51,11 +52,10 @@ public class TrainArrival implements Serializable {
         String displayMessage = "";
         long timeSpan = getArrivalDurationInSeconds();
 
-
         if(timeSpan < 60 || isApproaching){
             displayMessage = "Due";
         }else{
-            displayMessage = Double.toString(Math.floor(timeSpan / 60)) + " mins";
+            displayMessage = Integer.toString((int)Math.ceil(timeSpan / 60)) + " mins";
         }
 
         if(isDelayed){

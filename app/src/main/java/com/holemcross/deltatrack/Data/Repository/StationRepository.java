@@ -90,4 +90,54 @@ public class StationRepository extends DeltaTrackRepository{
         }
         return resultStations;
     }
+
+    public Station getStationByMapId(int mapId){
+        SQLiteDatabase db = getDb(true);
+
+        String[] projection = {
+                DeltaTrackContract.DeltaTrackStation._ID,
+                DeltaTrackContract.DeltaTrackStation.COLUMN_NAME_MAP_ID,
+                DeltaTrackContract.DeltaTrackStation.COLUMN_NAME_STATION_NAME
+        };
+
+        String selection = DeltaTrackContract.DeltaTrackStation.COLUMN_NAME_MAP_ID + " = ?";
+        String[] selectionArgs = { Integer.toString(mapId) };
+
+        Cursor c = db.query(
+                DeltaTrackContract.DeltaTrackStation.TABLE_NAME,    // The table to query
+                projection,                                         // The columns to return
+                selection,                                               // The columns for the WHERE clause
+                selectionArgs,                                               // The values for the WHERE clause
+                null,                                               // don't group the rows
+                null,                                               // don't filter by row groups
+                null                                                // The sort order
+        );
+        ArrayList<Station> resultStations = new ArrayList<Station>();
+        Station tempStation = null;
+        if(c.getCount() > 0){
+            c.moveToFirst();
+            while(!c.isAfterLast()){
+                tempStation = new Station();
+                tempStation.stationId = c.getLong( c.getColumnIndex(DeltaTrackContract.DeltaTrackStation._ID));
+                tempStation.mapId = c.getInt( c.getColumnIndex(DeltaTrackContract.DeltaTrackStation.COLUMN_NAME_MAP_ID));
+                tempStation.stationName = c.getString( c.getColumnIndex(DeltaTrackContract.DeltaTrackStation.COLUMN_NAME_STATION_NAME));
+                resultStations.add(tempStation);
+
+                c.moveToNext();
+            }
+        }
+
+        c.close();
+
+        StopRepository stopRepo = new StopRepository(db);
+        // Get Stops for stations
+        for (Station station: resultStations
+                ) {
+            station.stops = stopRepo.getStopsByMapId(station.mapId);
+        }
+        if(resultStations != null && resultStations.size() > 0){
+            return resultStations.get(0);
+        }
+        return null;
+    }
 }

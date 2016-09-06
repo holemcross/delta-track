@@ -142,10 +142,12 @@ public class CtaService {
             }
 
             NodeList etas = (NodeList) xPath.compile(etasExpression).evaluate(xmlDoc, XPathConstants.NODESET);
-
+            TrainArrival tempArrival = null;
             for (int i=0; i < etas.getLength();i++){
                 Node arrivalNode = etas.item(i);
-                resultArray.add(new TrainArrival((Element)arrivalNode));
+                tempArrival = new TrainArrival((Element)arrivalNode);
+                tempArrival.index = i;
+                resultArray.add(tempArrival);
             }
         }
         catch (IllegalArgumentException ex){

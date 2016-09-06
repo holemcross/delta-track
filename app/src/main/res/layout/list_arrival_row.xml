@@ -5,16 +5,25 @@
     android:layout_height="match_parent">
     <TextView
         android:id="@+id/list_arrival_index_label"
+        android:minEms="3"
+        android:textSize="60dp"
+        android:gravity="center"
         android:layout_weight="10"
         android:layout_width="wrap_content"
         android:layout_height="match_parent" />
     <TextView
         android:id="@+id/list_arrival_destination_label"
+        android:minEms="20"
+        android:textSize="60dp"
+        android:gravity="center"
         android:layout_weight="60"
         android:layout_width="wrap_content"
         android:layout_height="match_parent" />
     <TextView
         android:id="@+id/list_arrival_display"
+        android:minEms="7"
+        android:textSize="60dp"
+        android:gravity="center"
         android:layout_weight="30"
         android:layout_width="wrap_content"
         android:layout_height="match_parent" />

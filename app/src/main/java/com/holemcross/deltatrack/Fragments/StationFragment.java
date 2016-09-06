@@ -8,18 +8,19 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
-import android.text.Layout;
+import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Adapter;
-import android.widget.ArrayAdapter;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import com.holemcross.deltatrack.data.Station;
 import com.holemcross.deltatrack.data.TrainArrival;
+import com.holemcross.deltatrack.data.database.DeltaTrackDbHelper;
+import com.holemcross.deltatrack.data.repository.StationRepository;
 import com.holemcross.deltatrack.exceptions.CtaServiceException;
 import com.holemcross.deltatrack.R;
 import com.holemcross.deltatrack.services.CtaService;
@@ -29,7 +30,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 
 import helpers.Constants;
@@ -52,6 +52,8 @@ public class StationFragment extends Fragment {
     private static final String ARG_PARAM_MAPID = "mapId";
     private final int DEFAULT_MAP_ID = 40730; // Washington/Wells Station - Expect to remove default station on release
     private static final int MAX_TASK_RETRIES = 4;
+    private static final int MAX_ARRIVALS_PER_PAGE = 5;
+    private static final long VALID_ARRIVED_TRAIN_TIME_BUFFER = 60000; //Time in ms to consider arrival valid after arrival time occurs
 
     private int mStationMapId;
     private Date mLastArrivalsRefresh;
@@ -59,8 +61,17 @@ public class StationFragment extends Fragment {
     private ArrivalsListAdapter mArrivalsAdapter;
     private ListView mArrivalsListView;
     private int mRefreshArrivalsDelay; // In Seconds
+    private int mIteratePageDelay; // In Seconds
+    private int mClockUpdateDelay; // In Seconds
     private int mFetchTaskRetryCount;
+    private int mCurrentPage = 0;
+
     private final Handler mRefreshHandler = new Handler();
+    private OnFragmentInteractionListener mListener;
+
+
+    /////////////////////////////////////////
+    //      Runnables
 
     private final Runnable refreshArrivals = new Runnable() {
         @Override
@@ -73,8 +84,22 @@ public class StationFragment extends Fragment {
         }
     };
 
+    private final Runnable progressToNextPage = new Runnable() {
+        @Override
+        public void run() {
+            mRefreshHandler.postDelayed(this, mIteratePageDelay * 1000);
+            Log.v(Log_TAG,"Iterating Page.");
+            iteratePage();
+        }
+    };
 
-    private OnFragmentInteractionListener mListener;
+    private final Runnable updatesClock = new Runnable() {
+        @Override
+        public void run() {
+            updateClockTime();
+            mRefreshHandler.postDelayed(this, mClockUpdateDelay * 1000);
+        }
+    };
 
     public StationFragment() {
         // Required empty public constructor
@@ -87,7 +112,6 @@ public class StationFragment extends Fragment {
      * @param mapId
      * @return A new instance of fragment StationFragment.
      */
-    // TODO: Rename and change types and number of parameters
     public static StationFragment newInstance(int mapId) {
         StationFragment fragment = new StationFragment();
         Bundle args = new Bundle();
@@ -100,8 +124,11 @@ public class StationFragment extends Fragment {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mFetchTaskRetryCount = 0;
-        mRefreshArrivalsDelay = 15;
+        mRefreshArrivalsDelay = 60;
+        mIteratePageDelay = 10;
+        mClockUpdateDelay = 5;
         mArrivals = new ArrayList<TrainArrival>();
+
         if(savedInstanceState != null){
             // restore state data
             mStationMapId = savedInstanceState.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
@@ -118,7 +145,6 @@ public class StationFragment extends Fragment {
             mArrivals = (ArrayList<TrainArrival>) Serializer.deserializeObject(savedInstanceState.getByteArray(Constants.StationFragment.STATE_ARRIVALS));
             Log.v(Log_TAG, "Restored Station Fragment from saved state.");
 
-            mRefreshHandler.post(refreshArrivals);
         }else{
             if (getArguments() != null) {
                 mStationMapId = getArguments().getInt(ARG_PARAM_MAPID, DEFAULT_MAP_ID);
@@ -127,19 +153,30 @@ public class StationFragment extends Fragment {
                 mStationMapId = prefs.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
             }
         }
-
-
-
-        Log.v(Log_TAG, "Task has executed!");
-
-        saveStateToPreferences();
-
-
     }
 
     @Override
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
+
+        // Set Station Name
+        DeltaTrackDbHelper helper = new DeltaTrackDbHelper(getContext());
+        StationRepository stationRepository = new StationRepository(helper);
+        Station currentStation = stationRepository.getStationByMapId(mStationMapId);
+        String stationNameText = "Station Name";
+        if(currentStation != null){
+            stationNameText = currentStation.stationName;
+        }
+        TextView stationNameTextView = (TextView)getActivity().findViewById(R.id.dashHeaderStationNameLabel);
+        if(stationNameTextView != null){
+            stationNameTextView.setText(stationNameText);
+        }
+
+        // Set Last Update
+        updateLastUpdateTime();
+
+        // Set Clock
+        updateClockTime();
 
         if(mArrivalsListView == null){
             mArrivalsListView = (ListView)getView().findViewById(R.id.dashArrivalsListView);
@@ -150,6 +187,11 @@ public class StationFragment extends Fragment {
         mArrivalsListView.setAdapter(mArrivalsAdapter);
         // Activate Arrival Refresh Timer
         mRefreshHandler.post(refreshArrivals);
+        mRefreshHandler.post(progressToNextPage);
+        mRefreshHandler.post(updatesClock);
+
+        // Update UI
+        updateArrivalsUi();
     }
 
     @Override
@@ -194,20 +236,24 @@ public class StationFragment extends Fragment {
      * >Communicating with Other Fragments</a> for more information.
      */
     public interface OnFragmentInteractionListener {
-        // TODO: Update argument type and name
         void onFragmentInteraction(Uri uri);
     }
 
     @Override
     public void onPause() {
         super.onPause();
+        saveStateToPreferences();
         mRefreshHandler.removeCallbacks(refreshArrivals);
     }
 
     @Override
     public void onResume() {
         super.onResume();
+
+        // Add back handlers
         mRefreshHandler.post(refreshArrivals);
+        mRefreshHandler.post(progressToNextPage);
+        mRefreshHandler.post(updatesClock);
     }
 
     @Override
@@ -227,18 +273,24 @@ public class StationFragment extends Fragment {
 
     private void updateArrivalsUi(){
         Log.v(Log_TAG, "Refreshing Arrivals UI");
-        mArrivalsAdapter.updateArrayList(mArrivals);
-        /*
-        TextView arrivalTextView = (TextView) getActivity().findViewById(R.id.arrival_text);
+        mArrivalsAdapter.updateArrayList(getArrivalsForPage(mCurrentPage));
 
-        String arrivalsText = "";
-                for (TrainArrival arrival: mArrivals
-                ) {
-                    String arrivalTimeText = Long.toString(arrival.getArrivalDurationInSeconds()/60) + " mins";
-            arrivalsText += "Train:"+ arrival.runNumber + " " + arrivalTimeText+", ";
+        updateDisplayMessages();
+    }
+
+    private void updateDisplayMessages(){
+
+        // Check if No Arrivals in list
+        TextView noArrivalsTextView = (TextView)getActivity().findViewById(R.id.dash_no_arrivals_display_label);
+        if(noArrivalsTextView != null){
+            if(getValidTrainsList().size() > 0){
+                if(noArrivalsTextView.getVisibility() == View.VISIBLE){
+                    noArrivalsTextView.setVisibility(View.GONE);
+                }
+            }else{
+                noArrivalsTextView.setVisibility(View.VISIBLE);
+            }
         }
-        arrivalTextView.setText(arrivalsText);
-        */
     }
 
     private void saveStateToPreferences(){
@@ -247,6 +299,74 @@ public class StationFragment extends Fragment {
         editor.putInt(Constants.StationFragment.STATE_MAPID, mStationMapId);
         editor.commit();
     }
+
+    private void updateLastUpdateTime(){
+        TextView lastUpdateTextView = (TextView) getActivity().findViewById(R.id.dashHeaderUpdateLabel);
+        if(lastUpdateTextView != null){
+
+            if(mLastArrivalsRefresh == null){
+                lastUpdateTextView.setText("Last Updated Never");
+            }else{
+                mLastArrivalsRefresh = new Date();
+                SimpleDateFormat formatter =  new SimpleDateFormat("h:mmaa");
+                String lastUpdateText = "Last Updated " + formatter.format(mLastArrivalsRefresh);
+                lastUpdateTextView.setText(lastUpdateText);
+            }
+        }
+
+    }
+
+    private void updateClockTime(){
+        Date now = new Date();
+        SimpleDateFormat formatter = new SimpleDateFormat("MMM d, h:mmaa");
+        TextView clockTextView = (TextView) getActivity().findViewById(R.id.dashHeaderClockLabel);
+        if(clockTextView != null){
+            clockTextView.setText(formatter.format(now));
+        }
+    }
+
+    private void iteratePage(){
+        if(getArrivalsForPage(mCurrentPage+1).size() > 0){
+            mCurrentPage++;
+        }else{
+            mCurrentPage = 0;
+        }
+        updateArrivalsUi();
+    }
+
+    private ArrayList<TrainArrival> getArrivalsForPage(int pageNumber){
+
+        if(pageNumber >= getNumberPages()){
+
+            return new ArrayList<TrainArrival>();
+        }
+        ArrayList<TrainArrival> arrivalsList = getValidTrainsList();
+        int startIndex = pageNumber * MAX_ARRIVALS_PER_PAGE;
+        int endIndex = startIndex + MAX_ARRIVALS_PER_PAGE > arrivalsList.size() ? arrivalsList.size() : startIndex + MAX_ARRIVALS_PER_PAGE;
+        ArrayList<TrainArrival> resultList = new ArrayList<TrainArrival>(arrivalsList.subList(startIndex, endIndex));
+        return resultList;
+    }
+
+    private int getNumberPages(){
+        return (int)(Math.ceil(getValidTrainsList().size() / MAX_ARRIVALS_PER_PAGE));
+    }
+
+    private ArrayList<TrainArrival> getValidTrainsList(){
+        ArrayList<TrainArrival> validList = new ArrayList<TrainArrival>();
+        Date now = new Date();
+        now.setTime( now.getTime() + VALID_ARRIVED_TRAIN_TIME_BUFFER); // 1 min in ms
+        for (TrainArrival train: mArrivals
+             ) {
+            if(train.arrivalTime.after(now)){
+                validList.add(train);
+            }
+        }
+
+        return validList;
+    }
+
+    ///////////////////////////////////
+    //      Fetch Arrivals Task
 
     private class FetchArrivalsTask extends AsyncTask<Integer, Void, ArrayList<TrainArrival>> {
 
@@ -285,7 +405,13 @@ public class StationFragment extends Fragment {
                 mFetchTaskRetryCount = 0;
                 mLastArrivalsRefresh = new Date();
                 mArrivals = trainArrivals;
-                updateArrivalsUi();
+
+                // Update Last Update Label
+                updateLastUpdateTime();
+
+                // Update No Arrivals Display
+                updateDisplayMessages();
+
             }else{
                 // Failed to fetch results
                 if(mFetchTaskRetryCount < MAX_TASK_RETRIES){
@@ -301,6 +427,9 @@ public class StationFragment extends Fragment {
         }
     }
 
+    ///////////////////////////////////
+    //      FArray Adapter
+
     private class ArrivalsListAdapter extends BaseAdapter {
         private ArrayList<TrainArrival> mArrivalsList;
 
@@ -315,16 +444,17 @@ public class StationFragment extends Fragment {
 
         public void updateArrayList(ArrayList<TrainArrival> newArrivalsList){
             mArrivalsList = newArrivalsList;
+            mArrivalsAdapter.notifyDataSetChanged();
         }
 
         @Override
         public int getCount() {
-            return mArrivalsList.size();
+            return getArrivalsForPage(mCurrentPage).size();
         }
 
         @Override
         public Object getItem(int i) {
-            return mArrivalsList.get(i);
+            return getArrivalsForPage(mCurrentPage).get(i);
         }
 
         @Override
@@ -336,7 +466,7 @@ public class StationFragment extends Fragment {
         public View getView(int index, View convertView, ViewGroup parent) {
 
             // Get Arrival
-            TrainArrival arrival = mArrivalsList.get(index);
+            TrainArrival arrival = getArrivalsForPage(mCurrentPage).get(index);
 
             LayoutInflater inflator = getActivity().getLayoutInflater();
 
@@ -346,11 +476,20 @@ public class StationFragment extends Fragment {
             TextView destinationTextView = (TextView)row.findViewById(R.id.list_arrival_destination_label);
             TextView displayTextView = (TextView)row.findViewById(R.id.list_arrival_display);
 
-            indexTextView.setText(Integer.toString(index+1));
+            indexTextView.setText(Integer.toString(arrival.index+1));
+            indexTextView.setBackgroundResource(R.color.dashRowBackground);
+            indexTextView.setTextColor( ContextCompat.getColor(getContext(),R.color.dashRowText));
+
+            int backgroundColor = UiHelper.Colors.getRouteBackgroundColorByCtaRoute(arrival.route);
+            int textColor = ContextCompat.getColor(getContext(), UiHelper.Colors.getTextColorByCtaRoute(arrival.route));
+
             destinationTextView.setText(arrival.destinationName);
-            destinationTextView.setBackgroundColor(UiHelper.Colors.getRouteBackgroundColorByCtaRoute(arrival.route));
-            destinationTextView.setTextColor(UiHelper.Colors.getTextColorByCtaRoute(arrival.route));
+            destinationTextView.setBackgroundResource(backgroundColor);
+            destinationTextView.setTextColor(textColor);
+
             displayTextView.setText(arrival.getArrivalDisplay());
+            displayTextView.setBackgroundResource(backgroundColor);
+            displayTextView.setTextColor(textColor);
 
             return row;
         }

@@ -9,34 +9,43 @@ import com.holemcross.deltatrack.data.CtaRoutes;
 public class UiHelper {
     public static class Colors{
        public static int getRouteBackgroundColorByCtaRoute(CtaRoutes route){
+           int result = 0;
            switch (route){
                case Blue:
-                   return R.color.dashRowTrainBlue;
+                   result = R.color.dashRowTrainBlue;
+                   break;
                case Brown:
-                   return R.color.dashRowTrainBrown;
+                   result =  R.color.dashRowTrainBrown;
+                   break;
                case Green:
-                   return R.color.dashRowTrainGreen;
+                   result =  R.color.dashRowTrainGreen;
+                   break;
                case Orange:
-                   return R.color.dashRowTrainOrange;
+                   result =  R.color.dashRowTrainOrange;
+                   break;
                case Pink:
-                   return R.color.dashRowTrainPink;
+                   result =  R.color.dashRowTrainPink;
+                   break;
                case Purple:
-                   return R.color.dashRowTrainPurple;
+                   result =  R.color.dashRowTrainPurple;
+                   break;
                case Red:
-                   return R.color.dashRowTrainRed;
+                   result =  R.color.dashRowTrainRed;
+                   break;
                case Yellow:
-                   return R.color.dashRowTrainYellow;
-               default:
-                   return 0;
+                   result =  R.color.dashRowTrainYellow;
+                   break;
            }
+           return result;
        }
         public static int getTextColorByCtaRoute(CtaRoutes route){
+            int result = R.color.dashRowText;
             switch (route){
                 case Yellow:
-                    return R.color.dashRowTextDark;
-                default:
-                    return R.color.dashRowText;
+                    result = R.color.dashRowTextDark;
+                    break;
             }
+            return result;
         }
     }
 }

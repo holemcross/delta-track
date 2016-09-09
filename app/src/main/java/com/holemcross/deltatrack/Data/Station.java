@@ -1,4 +1,5 @@
 package com.holemcross.deltatrack.data;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -7,7 +8,7 @@ import java.util.Set;
 /**
  * Created by amortega on 8/25/2016.
  */
-public class Station {
+public class Station implements Serializable {
     public long stationId;
     public String stationName;
     public int mapId;

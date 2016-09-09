@@ -1,8 +1,11 @@
 package com.holemcross.deltatrack.activities;
 
 import android.annotation.SuppressLint;
-import android.content.SharedPreferences;
+import android.app.ProgressDialog;
 import android.net.Uri;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentTransaction;
+import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
@@ -17,6 +20,7 @@ import com.holemcross.deltatrack.data.repository.StationRepository;
 import com.holemcross.deltatrack.data.Station;
 import com.holemcross.deltatrack.data.database.DeltaTrackDbHelper;
 import com.holemcross.deltatrack.exceptions.CtaServiceException;
+import com.holemcross.deltatrack.fragments.SettingsFragment;
 import com.holemcross.deltatrack.fragments.StationFragment;
 import com.holemcross.deltatrack.services.CtaService;
 
@@ -29,7 +33,8 @@ import helpers.Constants;
  * status bar and navigation/system bar) with user interaction.
  */
 public class DeltaTrackActivity extends AppCompatActivity
-        implements StationFragment.OnFragmentInteractionListener {
+        implements StationFragment.OnStationFragmentInteractionListener,
+        SettingsFragment.OnSettingsFragmentInteractionListener {
 
     private final String LOG_TAG = DeltaTrackActivity.class.getSimpleName();
     private final int DEFAULT_MAP_ID = 40730; // Washington/Wells Station - Expect to remove default station on release
@@ -80,7 +85,7 @@ public class DeltaTrackActivity extends AppCompatActivity
             if (actionBar != null) {
                 actionBar.show();
             }
-            mControlsView.setVisibility(View.VISIBLE);
+            //mControlsView.setVisibility(View.VISIBLE);
         }
     };
     private boolean mVisible;
@@ -98,9 +103,10 @@ public class DeltaTrackActivity extends AppCompatActivity
     private final View.OnTouchListener mDelayHideTouchListener = new View.OnTouchListener() {
         @Override
         public boolean onTouch(View view, MotionEvent motionEvent) {
-            if (AUTO_HIDE) {
-                delayedHide(AUTO_HIDE_DELAY_MILLIS);
-            }
+            //if (AUTO_HIDE) {
+            //    delayedHide(AUTO_HIDE_DELAY_MILLIS);
+            //}
+            Log.v(LOG_TAG,"Touch has been detected!");
             return false;
         }
     };
@@ -111,29 +117,54 @@ public class DeltaTrackActivity extends AppCompatActivity
         task.execute();
     }
 
+    public void changeStation(Station station){
+        SharedPreferences sharedPreferences = getSharedPreferences(Constants.SYSTEM_SETTINGS_NAME, MODE_PRIVATE);
+        SharedPreferences.Editor spEditor = sharedPreferences.edit();
+        spEditor.putInt(Constants.StationFragment.STATE_MAPID, station.mapId);
+        spEditor.commit();
+
+        // Load Station Fragment
+
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        fragmentManager.popBackStackImmediate();
+
+        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+        StationFragment stationFragment = StationFragment.newInstance(station.mapId);
+        fragmentTransaction.replace(R.id.fullscreen_content, stationFragment);
+        fragmentTransaction.addToBackStack(null);
+        fragmentTransaction.commit();
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_delta_track);
 
+        // Hide Action Bar
+        ActionBar actionBar = getSupportActionBar();
+        actionBar.hide();
+
+        if(savedInstanceState != null){
+            // Already loaded content. Skip
+            return;
+        }
         mVisible = true;
-        mControlsView = findViewById(R.id.fullscreen_content_controls);
+        //mControlsView = findViewById(R.id.fullscreen_content_controls);
         mContentView = findViewById(R.id.fullscreen_content);
 
-
         // Set up the user interaction to manually show or hide the system UI.
-        mContentView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                toggle();
-            }
-        });
+        //mContentView.setOnClickListener(new View.OnClickListener() {
+        //    @Override
+        //    public void onClick(View view) {
+        //        toggle();
+        //    }
+        //});
 
         // Upon interacting with UI controls, delay any scheduled hide()
         // operations to prevent the jarring behavior of controls going away
         // while interacting with the UI.
-        findViewById(R.id.dummy_button).setOnTouchListener(mDelayHideTouchListener);
+        //findViewById(R.id.dummy_button).setOnTouchListener(mDelayHideTouchListener);
 
         // Database Checks
         DeltaTrackDbHelper dbHelper = new DeltaTrackDbHelper(getApplicationContext());
@@ -147,22 +178,21 @@ public class DeltaTrackActivity extends AppCompatActivity
         StationRepository stationRepo = new StationRepository(dbHelper);
         mStations = stationRepo.getAllStations();
 
+        boolean hasStations = true;
         if(mStations == null || mStations.size() <= 0)
         {
+            hasStations = false;
             // Perform Fetch
             Log.d(LOG_TAG, "Stations do not exist in DB. Fetching.");
             FetchStationsTask task = new FetchStationsTask();
             task.execute();
         }
 
-        // Get Current MapId
-        SharedPreferences pref = this.getPreferences(MODE_PRIVATE);
-        int currentMapId = pref.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
-
-        // Create Station Fragment
-
-
+        if(hasStations){
+            goToDashboard();
+        }
     }
+
 
     @Override
     protected void onPostCreate(Bundle savedInstanceState) {
@@ -174,12 +204,29 @@ public class DeltaTrackActivity extends AppCompatActivity
         delayedHide(100);
     }
 
+    private void goToDashboard(){
+        // Get Current MapId
+        SharedPreferences pref = this.getPreferences(MODE_PRIVATE);
+        int currentMapId = pref.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
+
+        // Create Station Fragment
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        fragmentManager.popBackStackImmediate();
+
+        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+        StationFragment stationFragment = StationFragment.newInstance(currentMapId);
+        fragmentTransaction.add(R.id.fullscreen_content, stationFragment);
+        fragmentTransaction.addToBackStack(null);
+        fragmentTransaction.commit();
+    }
+
     private void toggle() {
-        if (mVisible) {
-            hide();
-        } else {
-            show();
-        }
+        //if (mVisible) {
+        //    hide();
+        //} else {
+        //    show();
+        //}
+        Log.v(LOG_TAG, "Click Event DETECTED!");
     }
 
     private void hide() {
@@ -188,7 +235,7 @@ public class DeltaTrackActivity extends AppCompatActivity
         if (actionBar != null) {
             actionBar.hide();
         }
-        mControlsView.setVisibility(View.GONE);
+        //mControlsView.setVisibility(View.GONE);
         mVisible = false;
 
         // Schedule a runnable to remove the status and navigation bar after a delay
@@ -217,9 +264,25 @@ public class DeltaTrackActivity extends AppCompatActivity
         mHideHandler.postDelayed(mHideRunnable, delayMillis);
     }
 
+
     @Override
-    public void onFragmentInteraction(Uri uri) {
+    public void onStationFragmentTouch() {
         // Do nothing
+        // Toggle Menu
+
+        show();
+
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+        SettingsFragment settingsFragment = SettingsFragment.newInstance(mStations);
+        fragmentTransaction.replace(R.id.fullscreen_content, settingsFragment);
+        fragmentTransaction.addToBackStack(null);
+        fragmentTransaction.commit();
+    }
+
+    @Override
+    public void onSettingsFragmentInteraction() {
+        // Stub, Leave blank
     }
 
     @Override
@@ -235,6 +298,13 @@ public class DeltaTrackActivity extends AppCompatActivity
     }
 
     private class FetchStationsTask extends AsyncTask<String, Void, ArrayList<Station>> {
+        private ProgressDialog mDialog;
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            mDialog = ProgressDialog.show(DeltaTrackActivity.this, "Loading", "Please wait...", true);
+        }
 
         @Override
         protected ArrayList<Station> doInBackground(String... args) {
@@ -272,6 +342,10 @@ public class DeltaTrackActivity extends AppCompatActivity
                     dbHelper.onCreate(dbHelper.getWritableDatabase());
                     StationRepository stationRepo = new StationRepository(dbHelper);
                     stationRepo.insertStations(mStations);
+
+                    mDialog.dismiss();
+
+                    goToDashboard();
                 }
             }
         }

@@ -4,10 +4,62 @@
     android:layout_height="match_parent"
     tools:context="com.holemcross.deltatrack.fragments.SettingsFragment">
 
-    <!-- TODO: Update blank fragment layout -->
-    <TextView
+    <LinearLayout
+        android:orientation="horizontal"
+        android:background="@color/settingsBackground"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:text="@string/hello_blank_fragment" />
+        android:layout_height="match_parent">
+
+        <RelativeLayout
+            android:layout_weight="50"
+            android:layout_width="0dp"
+            android:layout_height="match_parent">
+            <ListView
+                android:id="@+id/settings_menu_list_view"
+                android:background="@color/settingsRow"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent">
+            </ListView>
+        </RelativeLayout>
+        <RelativeLayout
+            android:layout_weight="50"
+            android:layout_width="0dp"
+            android:layout_height="match_parent">
+            <LinearLayout
+                android:id="@+id/settings_menu_context_view"
+                android:background="@color/settingsRow"
+                android:orientation="horizontal"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent">
+            </LinearLayout>
+        </RelativeLayout>
+
+    <!--
+    <ListView
+        android:id="@+id/settings_menu_list_view"
+        android:background="@color/dashRowTrainPink"
+        android:layout_weight="30"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent">
+    </ListView>
+    <Space
+        android:layout_weight="10"
+        android:background="@color/dashRowTrainYellow"
+        android:minWidth="30dp"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent" />
+    <LinearLayout
+        android:id="@+id/settings_menu_context_view"
+        android:minWidth="300dp"
+        android:background="@color/dashRowTrainGreen"
+        android:orientation="horizontal"
+        android:layout_weight="60"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent">
+
+    </LinearLayout>
+    -->
+
+    </LinearLayout>
 
 </FrameLayout>

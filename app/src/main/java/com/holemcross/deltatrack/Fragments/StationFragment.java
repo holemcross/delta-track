@@ -2,13 +2,15 @@ package com.holemcross.deltatrack.fragments;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
+import android.support.v7.app.ActionBar;
+import android.support.v7.app.AppCompatActivity;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -40,7 +42,7 @@ import helpers.UiHelper;
 /**
  * A simple {@link Fragment} subclass.
  * Activities that contain this fragment must implement the
- * {@link StationFragment.OnFragmentInteractionListener} interface
+ * {@link OnStationFragmentInteractionListener} interface
  * to handle interaction events.
  * Use the {@link StationFragment#newInstance} factory method to
  * create an instance of this fragment.
@@ -64,10 +66,9 @@ public class StationFragment extends Fragment {
     private int mIteratePageDelay; // In Seconds
     private int mClockUpdateDelay; // In Seconds
     private int mFetchTaskRetryCount;
-    private int mCurrentPage = 0;
 
     private final Handler mRefreshHandler = new Handler();
-    private OnFragmentInteractionListener mListener;
+    private OnStationFragmentInteractionListener mListener;
 
 
     /////////////////////////////////////////
@@ -89,7 +90,10 @@ public class StationFragment extends Fragment {
         public void run() {
             mRefreshHandler.postDelayed(this, mIteratePageDelay * 1000);
             Log.v(Log_TAG,"Iterating Page.");
-            iteratePage();
+
+            if(mArrivalsAdapter != null){
+                mArrivalsAdapter.iteratePage();
+            }
         }
     };
 
@@ -130,24 +134,10 @@ public class StationFragment extends Fragment {
         mArrivals = new ArrayList<TrainArrival>();
 
         if(savedInstanceState != null){
-            // restore state data
-            mStationMapId = savedInstanceState.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
-
-            SimpleDateFormat dateFormat = new SimpleDateFormat("dow mon dd hh:mm:ss zzz yyyy", Locale.ENGLISH);
-            Date restoredDate = new Date();
-            try{
-                restoredDate = dateFormat.parse(savedInstanceState.getString(Constants.StationFragment.STATE_LAST_REFRESH));
-            }catch(ParseException ex){
-                Log.e(Log_TAG, ex.getMessage());
-            }
-            mLastArrivalsRefresh = restoredDate;
-
-            mArrivals = (ArrayList<TrainArrival>) Serializer.deserializeObject(savedInstanceState.getByteArray(Constants.StationFragment.STATE_ARRIVALS));
-            Log.v(Log_TAG, "Restored Station Fragment from saved state.");
-
+            restoreStateFromSavedState(savedInstanceState);
         }else{
             if (getArguments() != null) {
-                mStationMapId = getArguments().getInt(ARG_PARAM_MAPID, DEFAULT_MAP_ID);
+                restoreStateFromSavedState(getArguments());
             }else{
                 SharedPreferences prefs = getContext().getSharedPreferences(Constants.SYSTEM_SETTINGS_NAME, Context.MODE_PRIVATE);
                 mStationMapId = prefs.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
@@ -159,39 +149,33 @@ public class StationFragment extends Fragment {
     public void onActivityCreated(@Nullable Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
 
+        if(savedInstanceState != null){
+            restoreStateFromSavedState(savedInstanceState);
+        }
+
         // Set Station Name
         DeltaTrackDbHelper helper = new DeltaTrackDbHelper(getContext());
         StationRepository stationRepository = new StationRepository(helper);
         Station currentStation = stationRepository.getStationByMapId(mStationMapId);
-        String stationNameText = "Station Name";
+
         if(currentStation != null){
-            stationNameText = currentStation.stationName;
-        }
-        TextView stationNameTextView = (TextView)getActivity().findViewById(R.id.dashHeaderStationNameLabel);
-        if(stationNameTextView != null){
-            stationNameTextView.setText(stationNameText);
+            mStationMapId = currentStation.mapId;
+            updateStationUi(currentStation);
         }
 
-        // Set Last Update
-        updateLastUpdateTime();
-
-        // Set Clock
-        updateClockTime();
-
-        if(mArrivalsListView == null){
-            mArrivalsListView = (ListView)getView().findViewById(R.id.dashArrivalsListView);
-        }
+        mArrivalsListView = (ListView)getView().findViewById(R.id.dashArrivalsListView);
         if(mArrivalsAdapter == null){
             mArrivalsAdapter = new ArrivalsListAdapter(mArrivals);
+        }else{
+            mArrivalsAdapter.updateArrayList(mArrivals);
         }
         mArrivalsListView.setAdapter(mArrivalsAdapter);
-        // Activate Arrival Refresh Timer
-        mRefreshHandler.post(refreshArrivals);
-        mRefreshHandler.post(progressToNextPage);
-        mRefreshHandler.post(updatesClock);
 
         // Update UI
+        updateLastUpdateTime();
+        updateClockTime();
         updateArrivalsUi();
+
     }
 
     @Override
@@ -201,21 +185,14 @@ public class StationFragment extends Fragment {
         return inflater.inflate(R.layout.fragment_station, container, false);
     }
 
-    // TODO: Rename method, update argument and hook method into UI event
-    public void onButtonPressed(Uri uri) {
-        if (mListener != null) {
-            mListener.onFragmentInteraction(uri);
-        }
-    }
-
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        if (context instanceof OnFragmentInteractionListener) {
-            mListener = (OnFragmentInteractionListener) context;
+        if (context instanceof OnStationFragmentInteractionListener) {
+            mListener = (OnStationFragmentInteractionListener) context;
         } else {
             throw new RuntimeException(context.toString()
-                    + " must implement OnFragmentInteractionListener");
+                    + " must implement OnStationFragmentInteractionListener");
         }
     }
 
@@ -223,6 +200,102 @@ public class StationFragment extends Fragment {
     public void onDetach() {
         super.onDetach();
         mListener = null;
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        saveStateToPreferences();
+        mRefreshHandler.removeCallbacks(refreshArrivals);
+        mRefreshHandler.removeCallbacks(progressToNextPage);
+        mRefreshHandler.removeCallbacks(updatesClock);
+        detatchClickListener();
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        // Check if MapId has changed
+        SharedPreferences sharedPreferences = getActivity().getSharedPreferences(Constants.SYSTEM_SETTINGS_NAME,Context.MODE_PRIVATE);
+        int sharedPrefMapId = sharedPreferences.getInt(Constants.StationFragment.STATE_MAPID, -1);
+        if(sharedPrefMapId > -1 && sharedPrefMapId != mStationMapId){
+            // Get Station from DB
+            changeStationByMapId(sharedPrefMapId);
+        }
+
+        // Set Full Screen
+        getView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN);
+        // Hide AutoBar
+        ActionBar actionBar = ((AppCompatActivity)getActivity()).getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.hide();
+        }
+        // Add back handlers
+        mRefreshHandler.post(refreshArrivals);
+        mRefreshHandler.post(progressToNextPage);
+        mRefreshHandler.post(updatesClock);
+
+        attachClickListener();
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        outState.putInt(Constants.StationFragment.STATE_MAPID, mStationMapId);
+        outState.putLong(Constants.StationFragment.STATE_LAST_REFRESH, mLastArrivalsRefresh.getTime());
+        outState.putByteArray(Constants.StationFragment.STATE_ARRIVALS, Serializer.serializeObject(mArrivals));
+        super.onSaveInstanceState(outState);
+    }
+
+    public void changeStationByMapId(int mapId){
+        DeltaTrackDbHelper dbHelper = new DeltaTrackDbHelper(getContext());
+        StationRepository repo = new StationRepository(dbHelper);
+        Station dbStation = repo.getStationByMapId(mapId);
+        if(dbStation != null){
+            changeStation(dbStation);
+        }
+    }
+
+    // Public method for changing station from activity
+    public void changeStation(Station newStation){
+        if(newStation != null){
+
+            mStationMapId = newStation.mapId;
+            mLastArrivalsRefresh = null;
+            mArrivals = null;
+            saveStateToPreferences();
+            updateStationUi(newStation);
+
+            if(mArrivalsAdapter != null){
+                //mArrivalsAdapter.clearList();
+            }
+
+            FetchArrivalsTask task = new FetchArrivalsTask();
+            task.execute(mStationMapId);
+        }
+    }
+
+    private void restoreStateFromSavedState(Bundle savedState){
+        // restore state data
+
+        // Get MapId
+        mStationMapId = savedState.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
+        long restoreDateValue = savedState.getLong(Constants.StationFragment.STATE_LAST_REFRESH, 0);
+        if(restoreDateValue > 0){
+            mLastArrivalsRefresh = new Date(restoreDateValue);
+        }else{
+            mLastArrivalsRefresh = new Date();
+        }
+
+        byte[] arrivalsByteArray = savedState.getByteArray(Constants.StationFragment.STATE_ARRIVALS);
+
+        if(arrivalsByteArray != null && arrivalsByteArray.length > 0){
+            mArrivals = (ArrayList<TrainArrival>) Serializer.deserializeObject(savedState.getByteArray(Constants.StationFragment.STATE_ARRIVALS));
+        }else{
+            changeStationByMapId(mStationMapId);
+        }
+
+        Log.v(Log_TAG, "Restored Station Fragment from saved state.");
     }
 
     /**
@@ -235,46 +308,13 @@ public class StationFragment extends Fragment {
      * "http://developer.android.com/training/basics/fragments/communicating.html"
      * >Communicating with Other Fragments</a> for more information.
      */
-    public interface OnFragmentInteractionListener {
-        void onFragmentInteraction(Uri uri);
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        saveStateToPreferences();
-        mRefreshHandler.removeCallbacks(refreshArrivals);
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-
-        // Add back handlers
-        mRefreshHandler.post(refreshArrivals);
-        mRefreshHandler.post(progressToNextPage);
-        mRefreshHandler.post(updatesClock);
-    }
-
-    @Override
-    public void onSaveInstanceState(Bundle outState) {
-        outState.putInt(Constants.StationFragment.STATE_MAPID, mStationMapId);
-        outState.putString(Constants.StationFragment.STATE_LAST_REFRESH, mLastArrivalsRefresh.toString());
-        outState.putByteArray(Constants.StationFragment.STATE_ARRIVALS, Serializer.serializeObject(mArrivals));
-
-        super.onSaveInstanceState(outState);
-    }
-
-    public void stationChanged(int newMapId){
-        mStationMapId = newMapId;
-        FetchArrivalsTask task = new FetchArrivalsTask();
-        task.execute(mStationMapId);
+    public interface OnStationFragmentInteractionListener {
+        void onStationFragmentTouch();
     }
 
     private void updateArrivalsUi(){
         Log.v(Log_TAG, "Refreshing Arrivals UI");
-        mArrivalsAdapter.updateArrayList(getArrivalsForPage(mCurrentPage));
-
+        mArrivalsAdapter.updateArrayList(mArrivals);
         updateDisplayMessages();
     }
 
@@ -282,8 +322,8 @@ public class StationFragment extends Fragment {
 
         // Check if No Arrivals in list
         TextView noArrivalsTextView = (TextView)getActivity().findViewById(R.id.dash_no_arrivals_display_label);
-        if(noArrivalsTextView != null){
-            if(getValidTrainsList().size() > 0){
+        if(noArrivalsTextView != null && mArrivalsAdapter != null){
+            if(mArrivalsAdapter.getValidTrainsList().size() > 0){
                 if(noArrivalsTextView.getVisibility() == View.VISIBLE){
                     noArrivalsTextView.setVisibility(View.GONE);
                 }
@@ -297,6 +337,7 @@ public class StationFragment extends Fragment {
         SharedPreferences prefs = getActivity().getPreferences(Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = prefs.edit();
         editor.putInt(Constants.StationFragment.STATE_MAPID, mStationMapId);
+        editor.putLong(Constants.StationFragment.STATE_LAST_REFRESH, mLastArrivalsRefresh == null ? -1 : mLastArrivalsRefresh.getTime());
         editor.commit();
     }
 
@@ -325,44 +366,31 @@ public class StationFragment extends Fragment {
         }
     }
 
-    private void iteratePage(){
-        if(getArrivalsForPage(mCurrentPage+1).size() > 0){
-            mCurrentPage++;
-        }else{
-            mCurrentPage = 0;
+    private void updateStationUi( Station station){
+        String stationNameText = "Station Name";
+        stationNameText = station.stationName;
+
+        TextView stationNameTextView = (TextView)getActivity().findViewById(R.id.dashHeaderStationNameLabel);
+        if(stationNameTextView != null){
+            stationNameTextView.setText(stationNameText);
         }
-        updateArrivalsUi();
     }
 
-    private ArrayList<TrainArrival> getArrivalsForPage(int pageNumber){
 
-        if(pageNumber >= getNumberPages()){
 
-            return new ArrayList<TrainArrival>();
-        }
-        ArrayList<TrainArrival> arrivalsList = getValidTrainsList();
-        int startIndex = pageNumber * MAX_ARRIVALS_PER_PAGE;
-        int endIndex = startIndex + MAX_ARRIVALS_PER_PAGE > arrivalsList.size() ? arrivalsList.size() : startIndex + MAX_ARRIVALS_PER_PAGE;
-        ArrayList<TrainArrival> resultList = new ArrayList<TrainArrival>(arrivalsList.subList(startIndex, endIndex));
-        return resultList;
-    }
-
-    private int getNumberPages(){
-        return (int)(Math.ceil(getValidTrainsList().size() / MAX_ARRIVALS_PER_PAGE));
-    }
-
-    private ArrayList<TrainArrival> getValidTrainsList(){
-        ArrayList<TrainArrival> validList = new ArrayList<TrainArrival>();
-        Date now = new Date();
-        now.setTime( now.getTime() + VALID_ARRIVED_TRAIN_TIME_BUFFER); // 1 min in ms
-        for (TrainArrival train: mArrivals
-             ) {
-            if(train.arrivalTime.after(now)){
-                validList.add(train);
+    private void attachClickListener(){
+        View view = getView();
+        view.setOnClickListener( new View.OnClickListener(){
+            @Override
+            public void onClick(View view) {
+                mListener.onStationFragmentTouch();
             }
-        }
+        });
+    }
 
-        return validList;
+    private void detatchClickListener(){
+        View view = getView();
+        view.setOnClickListener(null);
     }
 
     ///////////////////////////////////
@@ -406,6 +434,10 @@ public class StationFragment extends Fragment {
                 mLastArrivalsRefresh = new Date();
                 mArrivals = trainArrivals;
 
+                if(mArrivalsAdapter != null){
+                    mArrivalsAdapter.updateArrayList(mArrivals);
+                }
+
                 // Update Last Update Label
                 updateLastUpdateTime();
 
@@ -428,10 +460,12 @@ public class StationFragment extends Fragment {
     }
 
     ///////////////////////////////////
-    //      FArray Adapter
+    //      Arrivals Array Adapter
 
     private class ArrivalsListAdapter extends BaseAdapter {
         private ArrayList<TrainArrival> mArrivalsList;
+        private ArrayList<TrainArrival> mPaginatedList;
+        private int mCurrentPage = 0;
 
         public ArrivalsListAdapter() {
             super();
@@ -440,11 +474,68 @@ public class StationFragment extends Fragment {
         public ArrivalsListAdapter(ArrayList<TrainArrival> newList) {
             super();
             mArrivalsList = newList;
+            this.notifyDataSetChanged();
         }
 
         public void updateArrayList(ArrayList<TrainArrival> newArrivalsList){
+
             mArrivalsList = newArrivalsList;
-            mArrivalsAdapter.notifyDataSetChanged();
+            mCurrentPage = 0;
+            this.notifyDataSetChanged();
+        }
+
+        public void clearList(){
+            mArrivalsList = new ArrayList<>();
+            mCurrentPage = 0;
+            this.notifyDataSetChanged();
+        }
+
+        public void iteratePage(){
+            if(getArrivalsForPage(mCurrentPage+1).size() > 0){
+                mCurrentPage++;
+            }else{
+                mCurrentPage = 0;
+            }
+            updateArrayList(getArrivalsForPage(mCurrentPage));
+        }
+
+        private ArrayList<TrainArrival> getArrivalsForPage(int pageNumber){
+
+            if(pageNumber >= getNumberPages()){
+
+                return new ArrayList<TrainArrival>();
+            }
+            ArrayList<TrainArrival> arrivalsList = getValidTrainsList();
+            int startIndex = pageNumber * MAX_ARRIVALS_PER_PAGE;
+            int endIndex = startIndex + MAX_ARRIVALS_PER_PAGE > arrivalsList.size() ? arrivalsList.size() : startIndex + MAX_ARRIVALS_PER_PAGE;
+            ArrayList<TrainArrival> resultList = new ArrayList<TrainArrival>(arrivalsList.subList(startIndex, endIndex));
+            return resultList;
+        }
+
+        private int getNumberPages(){
+            int validTrainCount = getValidTrainsList().size();
+            if(validTrainCount <= MAX_ARRIVALS_PER_PAGE){
+                return 1;
+            }
+            return (int)(Math.ceil(getValidTrainsList().size() / MAX_ARRIVALS_PER_PAGE));
+        }
+
+        public ArrayList<TrainArrival> getValidTrainsList(){
+            if(mArrivalsList == null){
+                return new ArrayList<TrainArrival>();
+            }
+
+            ArrayList<TrainArrival> validList = new ArrayList<TrainArrival>();
+            Date now = new Date();
+            now.setTime( now.getTime() + VALID_ARRIVED_TRAIN_TIME_BUFFER); // 1 min in ms
+            for (TrainArrival train: mArrivalsList
+                    ) {
+                if(train.arrivalTime.after(now)){
+                    validList.add(train);
+                }
+            }
+
+            return validList;
         }
 
         @Override
@@ -480,7 +571,7 @@ public class StationFragment extends Fragment {
             indexTextView.setBackgroundResource(R.color.dashRowBackground);
             indexTextView.setTextColor( ContextCompat.getColor(getContext(),R.color.dashRowText));
 
-            int backgroundColor = UiHelper.Colors.getRouteBackgroundColorByCtaRoute(arrival.route);
+            int backgroundColor = UiHelper.Colors.getRouteBackgroundResourceByCtaRoute(arrival.route);
             int textColor = ContextCompat.getColor(getContext(), UiHelper.Colors.getTextColorByCtaRoute(arrival.route));
 
             destinationTextView.setText(arrival.destinationName);

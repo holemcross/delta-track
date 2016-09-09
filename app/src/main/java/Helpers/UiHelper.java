@@ -8,7 +8,7 @@ import com.holemcross.deltatrack.data.CtaRoutes;
  */
 public class UiHelper {
     public static class Colors{
-       public static int getRouteBackgroundColorByCtaRoute(CtaRoutes route){
+       public static int getRouteBackgroundResourceByCtaRoute(CtaRoutes route){
            int result = 0;
            switch (route){
                case Blue:

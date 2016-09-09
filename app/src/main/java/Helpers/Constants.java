@@ -14,6 +14,11 @@ public class Constants {
     public static final String CHICAGO_PORTAL_BASE_URI = "https://data.cityofchicago.org";
     public static final String APP_NAME = "Delta-Track";
 
+
+    public static final String STATION_FRAGMENT_NAME = "StationFragment";
+    public static final String SETTINGS_FRAGMENT_NAME = "SettingsFragment";
+
+
     public static final String SYSTEM_SETTINGS_NAME = "com.holemcross.deltatrack.system-settings";
     public static final String STATION_FRAGMENT_DATA = "com.holemcross.deltatrack.station-fragment-data";
 

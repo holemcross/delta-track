@@ -2,12 +2,13 @@ package com.holemcross.deltatrack.data;
 
 import com.google.gson.JsonObject;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 
 /**
  * Created by amortega on 8/30/2016.
  */
-public class Stop {
+public class Stop implements Serializable {
     public long id;
     public long stationId; // Foreign Key
     public String stationName;

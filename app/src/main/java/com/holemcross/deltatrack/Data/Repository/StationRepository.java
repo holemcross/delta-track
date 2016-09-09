@@ -129,15 +129,18 @@ public class StationRepository extends DeltaTrackRepository{
 
         c.close();
 
-        StopRepository stopRepo = new StopRepository(db);
-        // Get Stops for stations
-        for (Station station: resultStations
-                ) {
-            station.stops = stopRepo.getStopsByMapId(station.mapId);
+        if(resultStations.size() > 0){
+            StopRepository stopRepo = new StopRepository(db);
+            // Get Stops for stations
+            for (Station station: resultStations
+                    ) {
+                station.stops = stopRepo.getStopsByMapId(station.mapId);
+            }
+            if(resultStations != null && resultStations.size() > 0){
+                return resultStations.get(0);
+            }
         }
-        if(resultStations != null && resultStations.size() > 0){
-            return resultStations.get(0);
-        }
+
         return null;
     }
 }

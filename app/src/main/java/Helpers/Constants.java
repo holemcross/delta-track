@@ -22,6 +22,8 @@ public class Constants {
     public static final String SYSTEM_SETTINGS_NAME = "com.holemcross.deltatrack.system-settings";
     public static final String STATION_FRAGMENT_DATA = "com.holemcross.deltatrack.station-fragment-data";
 
+    public static final int DEFAULT_ARRIVALS_REFRESH_RATE = 60; // In Seconds
+
     public static final Map<String, CtaRoutes> CTA_ROUTES_MAP;
     static{
         Map<String, CtaRoutes> map = new HashMap<String, CtaRoutes>();
@@ -36,6 +38,11 @@ public class Constants {
         CTA_ROUTES_MAP = Collections.unmodifiableMap(map);
     }
 
+    public static class SystemSettings {
+        public static final String STATE_CTA_API_KEY = "com.holemcross.deltatrack.system-settings.state-cta-api-key";
+        public static final String STATE_ARRIVALS_REFRESH_RATE = "com.holemcross.deltatrack.system-settings.state-arrivals-refresh-rate";
+    }
+
     public static class StationFragment {
         public static final String STATE_MAPID = "com.holemcross.deltatrack.station-fragment.state-mapid";
         public static final String STATE_LAST_REFRESH = "com.holemcross.deltatrack.station-fragment.state-last-refresh";
@@ -43,6 +50,6 @@ public class Constants {
     }
 
     public static class Keys {
-        public static final String CtaApiKeyName = "CTA_API_KEY";
+        public static final int CTA_API_KEY_LENGTH = 32;
     }
 }

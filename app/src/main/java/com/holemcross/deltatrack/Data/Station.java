@@ -14,6 +14,23 @@ public class Station implements Serializable {
     public int mapId;
     public ArrayList<Stop> stops;
 
+    private static String[] descriptionExcludedWords = {
+            "Red",
+            "Blue",
+            "Brown",
+            "Green",
+            "Orange",
+            "Purple",
+            "Pink",
+            "Yellow",
+            "Lines",
+            "Line",
+            " & ",
+            ", ",
+            " - ",
+            "( )",
+            "()"
+    };
     public Station(){
 
     }
@@ -46,6 +63,18 @@ public class Station implements Serializable {
         Set<CtaRoutes> set = new HashSet<CtaRoutes>(resultList);
 
         return new ArrayList<CtaRoutes>(set);
+    }
+
+    public String getCleanNameDescription(){
+        String descriptiveName = stops.get(0).descriptiveName;
+
+        String oldString = descriptiveName;
+        for (String excludedPhrase: descriptionExcludedWords
+             ) {
+            oldString = oldString.replace(excludedPhrase, "");
+        }
+
+        return oldString;
     }
 
     public Location getLocation(){

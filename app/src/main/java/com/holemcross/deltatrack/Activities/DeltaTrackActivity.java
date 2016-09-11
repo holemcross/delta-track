@@ -14,6 +14,7 @@ import android.os.Handler;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Toast;
 
 import com.holemcross.deltatrack.R;
 import com.holemcross.deltatrack.data.repository.StationRepository;
@@ -38,6 +39,8 @@ public class DeltaTrackActivity extends AppCompatActivity
 
     private final String LOG_TAG = DeltaTrackActivity.class.getSimpleName();
     private final int DEFAULT_MAP_ID = 40730; // Washington/Wells Station - Expect to remove default station on release
+    private final String ARG_NAV_TO_DASHBOARD = "NAV_TO_DASHBOARD";
+    private final String ARG_DISPLAY_TOAST = "DISPLAY_TOAST";
     private ArrayList<Station> mStations;
 
     /**
@@ -59,35 +62,35 @@ public class DeltaTrackActivity extends AppCompatActivity
     private static final int UI_ANIMATION_DELAY = 300;
     private final Handler mHideHandler = new Handler();
     private View mContentView;
-    private final Runnable mHidePart2Runnable = new Runnable() {
-        @SuppressLint("InlinedApi")
-        @Override
-        public void run() {
-            // Delayed removal of status and navigation bar
-
-            // Note that some of these constants are new as of API 16 (Jelly Bean)
-            // and API 19 (KitKat). It is safe to use them, as they are inlined
-            // at compile-time and do nothing on earlier devices.
-            mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE
-                    | View.SYSTEM_UI_FLAG_FULLSCREEN
-                    | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                    | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                    | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                    | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
-        }
-    };
+    //private final Runnable mHidePart2Runnable = new Runnable() {
+    //    @SuppressLint("InlinedApi")
+    //    @Override
+    //    public void run() {
+    //        // Delayed removal of status and navigation bar
+//
+    //        // Note that some of these constants are new as of API 16 (Jelly Bean)
+    //        // and API 19 (KitKat). It is safe to use them, as they are inlined
+    //        // at compile-time and do nothing on earlier devices.
+    //        mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE
+    //                | View.SYSTEM_UI_FLAG_FULLSCREEN
+    //                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+    //                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+    //                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+    //                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+    //    }
+    //};
     private View mControlsView;
-    private final Runnable mShowPart2Runnable = new Runnable() {
-        @Override
-        public void run() {
-            // Delayed display of UI elements
-            ActionBar actionBar = getSupportActionBar();
-            if (actionBar != null) {
-                actionBar.show();
-            }
-            //mControlsView.setVisibility(View.VISIBLE);
-        }
-    };
+    //private final Runnable mShowPart2Runnable = new Runnable() {
+    //    @Override
+    //    public void run() {
+    //        // Delayed display of UI elements
+    //        ActionBar actionBar = getSupportActionBar();
+    //        if (actionBar != null) {
+    //            actionBar.show();
+    //        }
+    //        //mControlsView.setVisibility(View.VISIBLE);
+    //    }
+    //};
     private boolean mVisible;
     private final Runnable mHideRunnable = new Runnable() {
         @Override
@@ -114,7 +117,7 @@ public class DeltaTrackActivity extends AppCompatActivity
     public void refreshStations(){
         Log.d(LOG_TAG, "Refreshing Stations.");
         FetchStationsTask task = new FetchStationsTask();
-        task.execute();
+        task.execute(ARG_DISPLAY_TOAST);
     }
 
     public void changeStation(Station station){
@@ -142,9 +145,8 @@ public class DeltaTrackActivity extends AppCompatActivity
         setContentView(R.layout.activity_delta_track);
 
         // Hide Action Bar
-        ActionBar actionBar = getSupportActionBar();
-        actionBar.hide();
-
+        //ActionBar actionBar = getSupportActionBar();
+        //actionBar.hide();
         if(savedInstanceState != null){
             // Already loaded content. Skip
             return;
@@ -153,19 +155,7 @@ public class DeltaTrackActivity extends AppCompatActivity
         //mControlsView = findViewById(R.id.fullscreen_content_controls);
         mContentView = findViewById(R.id.fullscreen_content);
 
-        // Set up the user interaction to manually show or hide the system UI.
-        //mContentView.setOnClickListener(new View.OnClickListener() {
-        //    @Override
-        //    public void onClick(View view) {
-        //        toggle();
-        //    }
-        //});
-
-        // Upon interacting with UI controls, delay any scheduled hide()
-        // operations to prevent the jarring behavior of controls going away
-        // while interacting with the UI.
-        //findViewById(R.id.dummy_button).setOnTouchListener(mDelayHideTouchListener);
-
+        show();
         // Database Checks
         DeltaTrackDbHelper dbHelper = new DeltaTrackDbHelper(getApplicationContext());
 
@@ -185,7 +175,7 @@ public class DeltaTrackActivity extends AppCompatActivity
             // Perform Fetch
             Log.d(LOG_TAG, "Stations do not exist in DB. Fetching.");
             FetchStationsTask task = new FetchStationsTask();
-            task.execute();
+            task.execute(ARG_NAV_TO_DASHBOARD);
         }
 
         if(hasStations){
@@ -205,6 +195,9 @@ public class DeltaTrackActivity extends AppCompatActivity
     }
 
     private void goToDashboard(){
+
+        show();
+
         // Get Current MapId
         SharedPreferences pref = this.getPreferences(MODE_PRIVATE);
         int currentMapId = pref.getInt(Constants.StationFragment.STATE_MAPID, DEFAULT_MAP_ID);
@@ -231,16 +224,17 @@ public class DeltaTrackActivity extends AppCompatActivity
 
     private void hide() {
         // Hide UI first
+        mContentView.setSystemUiVisibility(0);
         ActionBar actionBar = getSupportActionBar();
-        if (actionBar != null) {
-            actionBar.hide();
-        }
+        //if (actionBar != null) {
+        //    actionBar.hide();
+        //}
         //mControlsView.setVisibility(View.GONE);
         mVisible = false;
 
         // Schedule a runnable to remove the status and navigation bar after a delay
-        mHideHandler.removeCallbacks(mShowPart2Runnable);
-        mHideHandler.postDelayed(mHidePart2Runnable, UI_ANIMATION_DELAY);
+        //mHideHandler.removeCallbacks(mShowPart2Runnable);
+        //mHideHandler.postDelayed(mHidePart2Runnable, UI_ANIMATION_DELAY);
     }
 
     @SuppressLint("InlinedApi")
@@ -251,8 +245,8 @@ public class DeltaTrackActivity extends AppCompatActivity
         mVisible = true;
 
         // Schedule a runnable to display UI elements after a delay
-        mHideHandler.removeCallbacks(mHidePart2Runnable);
-        mHideHandler.postDelayed(mShowPart2Runnable, UI_ANIMATION_DELAY);
+        //mHideHandler.removeCallbacks(mHidePart2Runnable);
+        //mHideHandler.postDelayed(mShowPart2Runnable, UI_ANIMATION_DELAY);
     }
 
     /**
@@ -270,7 +264,8 @@ public class DeltaTrackActivity extends AppCompatActivity
         // Do nothing
         // Toggle Menu
 
-        show();
+        //show();
+        hide();
 
         FragmentManager fragmentManager = getSupportFragmentManager();
         FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
@@ -298,17 +293,31 @@ public class DeltaTrackActivity extends AppCompatActivity
     }
 
     private class FetchStationsTask extends AsyncTask<String, Void, ArrayList<Station>> {
+
         private ProgressDialog mDialog;
+        private boolean mPerformNavigation;
+        private boolean mDisplayToast;
 
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-            mDialog = ProgressDialog.show(DeltaTrackActivity.this, "Loading", "Please wait...", true);
+            mDialog = ProgressDialog.show(DeltaTrackActivity.this, "Getting station information", "Please wait...", true);
         }
 
         @Override
         protected ArrayList<Station> doInBackground(String... args) {
             Log.v(LOG_TAG, "Entered Task.doInBackground()!");
+            if(args.length > 0){
+                for (String arg: args
+                     ) {
+                    if(arg == ARG_NAV_TO_DASHBOARD){
+                        mPerformNavigation = true;
+                    }
+                    if(arg == ARG_DISPLAY_TOAST){
+                        mDisplayToast = true;
+                    }
+                }
+            }
 
             CtaService service = new CtaService();
             ArrayList<Station> resultList = null;
@@ -345,7 +354,14 @@ public class DeltaTrackActivity extends AppCompatActivity
 
                     mDialog.dismiss();
 
-                    goToDashboard();
+                    if(mDisplayToast){
+                        Toast toast = Toast.makeText(getApplicationContext(), "Stations refresh complete.", Toast.LENGTH_SHORT);
+                        toast.show();
+                    }
+
+                    if(mPerformNavigation){
+                        goToDashboard();
+                    }
                 }
             }
         }

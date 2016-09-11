@@ -10,7 +10,6 @@ import android.support.v4.app.Fragment;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -27,12 +26,10 @@ import com.holemcross.deltatrack.exceptions.CtaServiceException;
 import com.holemcross.deltatrack.R;
 import com.holemcross.deltatrack.services.CtaService;
 
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 
 import java.util.Date;
-import java.util.Locale;
 
 import helpers.Constants;
 import helpers.KeyManager;
@@ -55,7 +52,7 @@ public class StationFragment extends Fragment {
     private final int DEFAULT_MAP_ID = 40730; // Washington/Wells Station - Expect to remove default station on release
     private static final int MAX_TASK_RETRIES = 4;
     private static final int MAX_ARRIVALS_PER_PAGE = 5;
-    private static final long VALID_ARRIVED_TRAIN_TIME_BUFFER = 60000; //Time in ms to consider arrival valid after arrival time occurs
+    private static final long VALID_ARRIVED_TRAIN_TIME_BUFFER = 180000; //Time in ms to consider arrival valid after arrival time occurs
 
     private int mStationMapId;
     private Date mLastArrivalsRefresh;
@@ -88,12 +85,12 @@ public class StationFragment extends Fragment {
     private final Runnable progressToNextPage = new Runnable() {
         @Override
         public void run() {
-            mRefreshHandler.postDelayed(this, mIteratePageDelay * 1000);
             Log.v(Log_TAG,"Iterating Page.");
 
             if(mArrivalsAdapter != null){
                 mArrivalsAdapter.iteratePage();
             }
+            mRefreshHandler.postDelayed(this, mIteratePageDelay * 1000);
         }
     };
 
@@ -129,7 +126,7 @@ public class StationFragment extends Fragment {
         super.onCreate(savedInstanceState);
         mFetchTaskRetryCount = 0;
         mRefreshArrivalsDelay = 60;
-        mIteratePageDelay = 10;
+        mIteratePageDelay = 5;
         mClockUpdateDelay = 5;
         mArrivals = new ArrayList<TrainArrival>();
 
@@ -223,6 +220,10 @@ public class StationFragment extends Fragment {
             // Get Station from DB
             changeStationByMapId(sharedPrefMapId);
         }
+
+        // Check if refresh rate has changed
+        int sharedPrefRefreshRate = sharedPreferences.getInt(Constants.SystemSettings.STATE_ARRIVALS_REFRESH_RATE, Constants.DEFAULT_ARRIVALS_REFRESH_RATE);
+        mRefreshArrivalsDelay = sharedPrefRefreshRate;
 
         // Set Full Screen
         getView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_FULLSCREEN);
@@ -406,7 +407,7 @@ public class StationFragment extends Fragment {
                 return new ArrayList<TrainArrival>();
             }
             int mapId = mapIds[0];
-            String apiKey = KeyManager.GetCtaApiKey(getContext());
+            String apiKey = KeyManager.getCtaApiKey(getContext());
 
             CtaService service = new CtaService();
             ArrayList<TrainArrival> resultList = null;
@@ -466,6 +467,7 @@ public class StationFragment extends Fragment {
         private ArrayList<TrainArrival> mArrivalsList;
         private ArrayList<TrainArrival> mPaginatedList;
         private int mCurrentPage = 0;
+        private int mLastPage = 0;
 
         public ArrivalsListAdapter() {
             super();
@@ -474,6 +476,9 @@ public class StationFragment extends Fragment {
         public ArrivalsListAdapter(ArrayList<TrainArrival> newList) {
             super();
             mArrivalsList = newList;
+            mCurrentPage = 0;
+            mPaginatedList = getArrivalsForPage(mCurrentPage);
+            mLastPage = 0;
             this.notifyDataSetChanged();
         }
 
@@ -481,6 +486,14 @@ public class StationFragment extends Fragment {
 
             mArrivalsList = newArrivalsList;
             mCurrentPage = 0;
+            mPaginatedList = getArrivalsForPage(mCurrentPage);
+            mLastPage = 0;
+            this.notifyDataSetChanged();
+        }
+
+        public void updatePaginationList(ArrayList<TrainArrival> newPaginationList){
+            mPaginatedList = newPaginationList;
+            mLastPage = mCurrentPage;
             this.notifyDataSetChanged();
         }
 
@@ -491,24 +504,36 @@ public class StationFragment extends Fragment {
         }
 
         public void iteratePage(){
-            if(getArrivalsForPage(mCurrentPage+1).size() > 0){
-                mCurrentPage++;
+            int numPages = getNumberPages();
+            int lookupPage = 0;
+            if(mCurrentPage + 1 < numPages)
+            {
+                lookupPage = mCurrentPage + 1;
+            }else{
+                lookupPage = 0;
+            }
+
+            if(getArrivalsForPage(lookupPage).size() > 0){
+                mCurrentPage = lookupPage;
             }else{
                 mCurrentPage = 0;
             }
-            updateArrayList(getArrivalsForPage(mCurrentPage));
+            if(mCurrentPage == mLastPage){
+                return;
+            }
+            updatePaginationList(getArrivalsForPage(mCurrentPage));
         }
 
         private ArrayList<TrainArrival> getArrivalsForPage(int pageNumber){
 
             if(pageNumber >= getNumberPages()){
-
                 return new ArrayList<TrainArrival>();
             }
             ArrayList<TrainArrival> arrivalsList = getValidTrainsList();
             int startIndex = pageNumber * MAX_ARRIVALS_PER_PAGE;
-            int endIndex = startIndex + MAX_ARRIVALS_PER_PAGE > arrivalsList.size() ? arrivalsList.size() : startIndex + MAX_ARRIVALS_PER_PAGE;
+            int endIndex = (startIndex + MAX_ARRIVALS_PER_PAGE) > arrivalsList.size() ? arrivalsList.size() : startIndex + MAX_ARRIVALS_PER_PAGE;
             ArrayList<TrainArrival> resultList = new ArrayList<TrainArrival>(arrivalsList.subList(startIndex, endIndex));
+
             return resultList;
         }
 
@@ -517,7 +542,7 @@ public class StationFragment extends Fragment {
             if(validTrainCount <= MAX_ARRIVALS_PER_PAGE){
                 return 1;
             }
-            return (int)(Math.ceil(getValidTrainsList().size() / MAX_ARRIVALS_PER_PAGE));
+            return (int)(Math.ceil(getValidTrainsList().size() / MAX_ARRIVALS_PER_PAGE))+1;
         }
 
         public ArrayList<TrainArrival> getValidTrainsList(){
@@ -527,7 +552,7 @@ public class StationFragment extends Fragment {
 
             ArrayList<TrainArrival> validList = new ArrayList<TrainArrival>();
             Date now = new Date();
-            now.setTime( now.getTime() + VALID_ARRIVED_TRAIN_TIME_BUFFER); // 1 min in ms
+            now.setTime( now.getTime() - VALID_ARRIVED_TRAIN_TIME_BUFFER); // 1 min in ms
             for (TrainArrival train: mArrivalsList
                     ) {
                 if(train.arrivalTime.after(now)){
@@ -540,12 +565,12 @@ public class StationFragment extends Fragment {
 
         @Override
         public int getCount() {
-            return getArrivalsForPage(mCurrentPage).size();
+            return mPaginatedList.size();
         }
 
         @Override
         public Object getItem(int i) {
-            return getArrivalsForPage(mCurrentPage).get(i);
+            return mPaginatedList.get(i);
         }
 
         @Override
@@ -557,7 +582,7 @@ public class StationFragment extends Fragment {
         public View getView(int index, View convertView, ViewGroup parent) {
 
             // Get Arrival
-            TrainArrival arrival = getArrivalsForPage(mCurrentPage).get(index);
+            TrainArrival arrival = mPaginatedList.get(index);
 
             LayoutInflater inflator = getActivity().getLayoutInflater();
 

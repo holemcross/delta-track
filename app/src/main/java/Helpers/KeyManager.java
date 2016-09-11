@@ -13,11 +13,11 @@ import com.holemcross.deltatrack.R;
  */
 public class KeyManager {
     private static String LOG_TAG = Constants.APP_NAME + " | " + KeyManager.class.getSimpleName();
-    public static String GetCtaApiKey(Context context){
+    public static String getCtaApiKey(Context context){
         // Get Saved CTA Key
         if(context != null){
             SharedPreferences sharedPref = context.getSharedPreferences(Constants.SYSTEM_SETTINGS_NAME, Context.MODE_PRIVATE);
-            String savedCtaApiKey = sharedPref.getString(Constants.Keys.CtaApiKeyName, null);
+            String savedCtaApiKey = sharedPref.getString(Constants.SystemSettings.STATE_CTA_API_KEY, null);
             if(!TextUtils.isEmpty(savedCtaApiKey)){
                 return savedCtaApiKey;
             }
@@ -31,5 +31,14 @@ public class KeyManager {
 
         Log.d(LOG_TAG, "Could not find CTA API Key");
         return "";
+    }
+
+    public static void saveCtaApiKey(Context context, String newKey){
+        if(context != null){
+            SharedPreferences sharedPref = context.getSharedPreferences(Constants.SYSTEM_SETTINGS_NAME, Context.MODE_PRIVATE);
+            SharedPreferences.Editor editor = sharedPref.edit();
+            editor.putString(Constants.SystemSettings.STATE_CTA_API_KEY, newKey);
+            editor.commit();
+        }
     }
 }

@@ -491,6 +491,10 @@ public class StationFragment extends Fragment {
             this.notifyDataSetChanged();
         }
 
+        public void updateUI(){
+            this.notifyDataSetChanged();
+        }
+
         public void updatePaginationList(ArrayList<TrainArrival> newPaginationList){
             mPaginatedList = newPaginationList;
             mLastPage = mCurrentPage;
@@ -519,6 +523,7 @@ public class StationFragment extends Fragment {
                 mCurrentPage = 0;
             }
             if(mCurrentPage == mLastPage){
+                updateUI();
                 return;
             }
             updatePaginationList(getArrivalsForPage(mCurrentPage));
